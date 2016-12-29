@@ -13,7 +13,45 @@ LONG ShapedButton::getMaskWidthFromPixelWidth(LONG widthInPixels) {
 	return (widthInPixels % 16 == 0 ? widthInPixels / 16 : widthInPixels / 16 + 1) * 2;
 }
 
-ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, LPCWSTR activePicturePath, LPCWSTR disabledPicturePath) {
+BOOL ShapedButton::IsCoordinatesInside(LONG x, LONG y) {
+	if (m_pButtonBits == NULL || m_bitMaskWidth == 0
+		|| y >= m_parentWindowHeight || x >= m_parentWindowWidth
+		|| y < 0 || x < 0) {
+		return FALSE;
+	}
+	else {
+		return (m_pButtonBits[y * m_bitMaskWidth + x / 8] >> (7 - (x % 8))) % 2 == 0;
+	}
+}
+
+ButtonStatus ShapedButton::getStatus() {
+	return m_status;
+}
+
+void ShapedButton::setStatus(ButtonStatus status) {
+	m_status = status;
+}
+
+void ShapedButton::OnDraw(HDC hdcMem, HDC hdcBuffer) {
+	if (m_status == ACTIVE) {
+		SelectObject(hdcMem, m_activePicture);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		SelectObject(hdcMem, m_hBmpButtonMask);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCAND);
+		SelectObject(hdcMem, m_activePicture);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+	}
+	else if (m_status == DISABLED) {
+		SelectObject(hdcMem, m_disabledPicture);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		SelectObject(hdcMem, m_hBmpButtonMask);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCAND);
+		SelectObject(hdcMem, m_disabledPicture);
+		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+	}
+}
+
+ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, HBITMAP activePicture, HBITMAP disabledPicture) {
 	BITMAP bm;
 
 	assert(maskPicture != NULL);
@@ -43,12 +81,8 @@ ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, LPCWSTR activePi
 		}
 	}
 
-	
-
-	m_activePicture = (HBITMAP)LoadImage(NULL, activePicturePath, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-	assert(m_activePicture != NULL);
-	m_disabledPicture = (HBITMAP)LoadImage(NULL, disabledPicturePath, IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-	assert(m_disabledPicture != NULL);
+	m_activePicture = activePicture;
+	m_disabledPicture = disabledPicture;
 
 	m_hBmpButtonMask = CreateBitmap(bm.bmWidth, bm.bmHeight, 1, 1, m_pButtonBits);
 }

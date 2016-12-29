@@ -5,9 +5,9 @@ void PlayerWindow::SetBitMaskBit(BYTE* pBits, LONG widthInBytes, LONG heightIdx,
 	pBits[ByteWithNeededBit] += 1 << (7 - (widthIdxInBits % 8));
 }
 
-HRGN PlayerWindow::ExtendRgn(HRGN hRgn, int x1, int y1, int x2, int y2) {
+HRGN PlayerWindow::ExtendRgn(HRGN hRgn, LONG x1, LONG y1, LONG x2, LONG y2) {
 	HRGN newHRgn = hRgn;
-	if (newHRgn == 0) {
+	if (newHRgn == NULL) {
 		newHRgn = CreateRectRgn(x1, y1, x2, y2);
 	}
 	else {
@@ -17,10 +17,9 @@ HRGN PlayerWindow::ExtendRgn(HRGN hRgn, int x1, int y1, int x2, int y2) {
 }
 
 HRGN PlayerWindow::CreateRegionByMask(BYTE* pWindowBits, LONG height, LONG width, BYTE maskColor) {
-	HRGN hRgn;
+	HRGN hRgn = NULL;
 	BYTE pixel;
 	LONG xStart = -1;
-
 	for (LONG heightIdx = 0; heightIdx < height; heightIdx++) {
 		for (LONG widthIdx = 0; widthIdx < width; widthIdx++) {
 			pixel = pWindowBits[heightIdx * width + widthIdx];
@@ -43,13 +42,11 @@ HRGN PlayerWindow::CreateRegionByMask(BYTE* pWindowBits, LONG height, LONG width
 	return hRgn;
 }
 
-PlayerWindow::PlayerWindow(LPCWSTR shapeMaskPicturePath, BYTE maskColor) {
+PlayerWindow::PlayerWindow(HBITMAP maskPicture, BYTE maskColor, HBITMAP backgroundPicture) {
 	BITMAP bm;
-	HBITMAP hMask = (HBITMAP)LoadImage(NULL, shapeMaskPicturePath, IMAGE_BITMAP, 0, 0
-		, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
-	assert(hMask != NULL);
 
-	GetObject(hMask, sizeof(bm), &bm);
+	GetObject(maskPicture, sizeof(bm), &bm);
+	assert(bm.bmBits != NULL);
 
 	m_bitMaskWidth = getMaskWidthFromPixelWidth(bm.bmWidth);
 
@@ -64,17 +61,16 @@ PlayerWindow::PlayerWindow(LPCWSTR shapeMaskPicturePath, BYTE maskColor) {
 	BYTE pixel;
 	for (LONG heightIdx = 0; heightIdx < bm.bmHeight; heightIdx++) {
 		for (LONG widthIdx = 0; widthIdx < bm.bmWidth; widthIdx++) {
-			pixel = pWindowBits[heightIdx * bm.bmWidth + widthIdx];
+			pixel = pMaskBits[heightIdx * bm.bmWidth + widthIdx];
 			if (pixel != maskColor) {
 				SetBitMaskBit(pWindowBits, m_bitMaskWidth, bm.bmHeight - heightIdx - 1, widthIdx);
 			}
 		}
 	}
-	HRGN hRgn = CreateRegionByMask(pWindowBits, m_windowHeight, m_windowWidth, maskColor);
+	m_hRgn = CreateRegionByMask(pMaskBits, m_windowHeight, m_windowWidth, maskColor);
 
-	m_hBmpWindowMask = CreateBitmap(bm.bmWidth, bm.bmHeight, 1, 1, pWindowBits);
-
-	DeleteObject(hMask);
+	m_hWindowHBitmap = CreateBitmap(bm.bmWidth, bm.bmHeight, 1, 1, pWindowBits);
+	m_BackgroundHBitmap = backgroundPicture;
 }
 
 LONG PlayerWindow::getMaskWidthFromPixelWidth(LONG widthInPixels) {
@@ -123,22 +119,97 @@ LRESULT PlayerWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 }
 
 void PlayerWindow::OnCreate() {
+	//TODO
+}
+
+bool PlayerWindow::CreateEx(DWORD dwExStyle, LPCTSTR IpszClass
+	, LPCTSTR IpszName, DWORD dwStyle, int x, int y, int nWidth
+	, int nHeight, HWND hParent, HMENU hMenu, HINSTANCE hlnst)
+{
+	if (!KWindow::CreateEx(dwExStyle, IpszClass
+		, IpszName, dwStyle, x, y, nWidth
+		, nHeight, hParent, hMenu, hlnst)) {
+		return FALSE;
+	}
 	
+	SetWindowRgn(m_hWnd, m_hRgn, TRUE);
+	return TRUE;
 }
 
 void PlayerWindow::addButton(ShapedButton button) {
-	m_buttons.push(button);
+	m_buttons.push_back(button);
 }
 
 void PlayerWindow::OnMouseMove(int x, int y) {
-	cursorOnButton = isCursorOnButton(x, y);
-	if (cursorOnButton && g_cursorState == ARROW) {
-		SetCursor(LoadCursor(NULL, IDC_HAND));
-		g_cursorState = HAND;
+	BOOL cursorOnButton = FALSE;
+
+	vector<ShapedButton>::iterator it;
+	for (it = m_buttons.begin(); it != m_buttons.end(); ++it) {
+		ShapedButton button = *it;
+		if (button.IsCoordinatesInside(x, y)) {
+			cursorOnButton = TRUE;
+			break;
+		}
 	}
-	else if (!cursorOnButton && g_cursorState == HAND) {
+	if (cursorOnButton) {
+		if (m_cursorState == ARROW) {
+			SetCursor(LoadCursor(NULL, IDC_HAND));
+			m_cursorState = HAND;
+		}
+	}
+	else if (m_cursorState == HAND) {
 		SetCursor(LoadCursor(NULL, IDC_ARROW));
-		g_cursorState = ARROW;
+		m_cursorState = ARROW;
 	}
+}
+
+void PlayerWindow::OnLButtonDown(int x, int y) {
+	vector<ShapedButton>::iterator buttonIterator;
+	for (buttonIterator = m_buttons.begin(); buttonIterator != m_buttons.end(); ++buttonIterator) {
+		if (buttonIterator->IsCoordinatesInside(x, y)) {
+			if (buttonIterator->getStatus() == DISABLED) {
+				buttonIterator->setStatus(ACTIVE);
+			}
+			else {
+				buttonIterator->setStatus(DISABLED);
+			}
+			break;
+		}
+	}
+	InvalidateRect(m_hWnd, NULL, FALSE);
+	//MessageBox(m_hWnd, _T("Õ¿∆¿À"), _T("Œ“∆¿À"), NULL);
+}
+
+void PlayerWindow::OnDraw(HDC hdc) {
+	if (m_BackgroundHBitmap == NULL) {
+		return;
+	}
+
+	BITMAP bitmap;
+	GetObject(m_BackgroundHBitmap, sizeof(bitmap), &bitmap);
+
+	HDC hdcMem = CreateCompatibleDC(hdc);
+	HGDIOBJ oldBitmap = SelectObject(hdcMem, m_BackgroundHBitmap);
+
+	HDC hdcBuffer = CreateCompatibleDC(hdc);
+	HBITMAP bufferBitmap = CreateCompatibleBitmap(hdc, bitmap.bmWidth, bitmap.bmHeight);
+	SelectObject(hdcBuffer, bufferBitmap);
+
+	MaskBlt(hdcBuffer, 0, 0, bitmap.bmWidth, bitmap.bmHeight, hdcMem, 0, 0, m_hWindowHBitmap, 0, 0, SRCCOPY);
+
+	vector<ShapedButton>::iterator it;
+	for (it = m_buttons.begin(); it != m_buttons.end(); ++it) {
+		it->OnDraw(hdcMem, hdcBuffer);
+	}
+
+	BitBlt(hdc, 0, 0, bitmap.bmWidth, bitmap.bmHeight, hdcBuffer, 0, 0, SRCCOPY);
+
+	SelectObject(hdcMem, oldBitmap);
+	DeleteDC(hdcBuffer);
+	DeleteObject(bufferBitmap);
+}
+
+void PlayerWindow::OnMciNotify(WPARAM wParam, LPARAM lParam) {
+	//TODO
 }
 
