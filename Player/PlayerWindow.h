@@ -8,6 +8,7 @@
 #include "ShapedButton.h"
 
 #include "KWindow.h"
+#include "BitsOperations.h"
 
 using namespace std;
 
@@ -36,10 +37,8 @@ private:
 	LRESULT WndProc(HWND hWnd, UINT uMsg,
 		WPARAM wParam, LPARAM IParam);
 
-	LONG getMaskWidthFromPixelWidth(LONG widthInPixels);
 	HRGN CreateRegionByMask(BYTE* pWindowBits, LONG m_windowHeight, LONG m_windowWidth, BYTE maskColor);
 	HRGN ExtendRgn(HRGN hRgn, LONG x1, LONG y1, LONG x2, LONG y2);
-	void SetBitMaskBit(BYTE* pBits, LONG widthInBytes, LONG heightIdx, LONG widthIdxInBits);
 
 	void OnMouseMove(int x, int y);
 	void OnLButtonDown(int x, int y);

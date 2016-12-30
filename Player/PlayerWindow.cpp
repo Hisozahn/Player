@@ -1,10 +1,5 @@
 #include "PlayerWindow.h"
 
-void PlayerWindow::SetBitMaskBit(BYTE* pBits, LONG widthInBytes, LONG heightIdx, LONG widthIdxInBits) {
-	LONG ByteWithNeededBit = heightIdx * widthInBytes + widthIdxInBits / 8;
-	pBits[ByteWithNeededBit] += 1 << (7 - (widthIdxInBits % 8));
-}
-
 HRGN PlayerWindow::ExtendRgn(HRGN hRgn, LONG x1, LONG y1, LONG x2, LONG y2) {
 	HRGN newHRgn = hRgn;
 	if (newHRgn == NULL) {
@@ -16,13 +11,13 @@ HRGN PlayerWindow::ExtendRgn(HRGN hRgn, LONG x1, LONG y1, LONG x2, LONG y2) {
 	return newHRgn;
 }
 
-HRGN PlayerWindow::CreateRegionByMask(BYTE* pWindowBits, LONG height, LONG width, BYTE maskColor) {
+HRGN PlayerWindow::CreateRegionByMask(BYTE* pWindowMaskBits, LONG height, LONG width, BYTE maskColor) {
 	HRGN hRgn = NULL;
 	BYTE pixel;
 	LONG xStart = -1;
 	for (LONG heightIdx = 0; heightIdx < height; heightIdx++) {
 		for (LONG widthIdx = 0; widthIdx < width; widthIdx++) {
-			pixel = pWindowBits[heightIdx * width + widthIdx];
+			pixel = pWindowMaskBits[heightIdx * width + widthIdx];
 
 			if (pixel != maskColor && xStart == -1) {
 				xStart = widthIdx;
@@ -48,7 +43,7 @@ PlayerWindow::PlayerWindow(HBITMAP maskPicture, BYTE maskColor, HBITMAP backgrou
 	GetObject(maskPicture, sizeof(bm), &bm);
 	assert(bm.bmBits != NULL);
 
-	m_bitMaskWidth = getMaskWidthFromPixelWidth(bm.bmWidth);
+	m_bitMaskWidth = BitsOperations::getWidthInBytes(bm.bmWidth);
 
 	BYTE* pWindowBits = new unsigned char[bm.bmHeight * m_bitMaskWidth];
 	memset(pWindowBits, 0, sizeof(unsigned char) * bm.bmHeight * m_bitMaskWidth);
@@ -63,7 +58,7 @@ PlayerWindow::PlayerWindow(HBITMAP maskPicture, BYTE maskColor, HBITMAP backgrou
 		for (LONG widthIdx = 0; widthIdx < bm.bmWidth; widthIdx++) {
 			pixel = pMaskBits[heightIdx * bm.bmWidth + widthIdx];
 			if (pixel != maskColor) {
-				SetBitMaskBit(pWindowBits, m_bitMaskWidth, bm.bmHeight - heightIdx - 1, widthIdx);
+				BitsOperations::setBitInBitArray(pWindowBits, m_bitMaskWidth, bm.bmHeight - heightIdx - 1, widthIdx);
 			}
 		}
 	}
@@ -71,10 +66,6 @@ PlayerWindow::PlayerWindow(HBITMAP maskPicture, BYTE maskColor, HBITMAP backgrou
 
 	m_hWindowHBitmap = CreateBitmap(bm.bmWidth, bm.bmHeight, 1, 1, pWindowBits);
 	m_BackgroundHBitmap = backgroundPicture;
-}
-
-LONG PlayerWindow::getMaskWidthFromPixelWidth(LONG widthInPixels) {
-	return (widthInPixels % 16 == 0 ? widthInPixels / 16 : widthInPixels / 16 + 1) * 2;
 }
 
 LRESULT PlayerWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -167,6 +158,7 @@ void PlayerWindow::OnLButtonDown(int x, int y) {
 	vector<ShapedButton>::iterator buttonIterator;
 	for (buttonIterator = m_buttons.begin(); buttonIterator != m_buttons.end(); ++buttonIterator) {
 		if (buttonIterator->IsCoordinatesInside(x, y)) {
+			buttonIterator->click();
 			if (buttonIterator->getStatus() == DISABLED) {
 				buttonIterator->setStatus(ACTIVE);
 			}
@@ -199,7 +191,7 @@ void PlayerWindow::OnDraw(HDC hdc) {
 
 	vector<ShapedButton>::iterator it;
 	for (it = m_buttons.begin(); it != m_buttons.end(); ++it) {
-		it->OnDraw(hdcMem, hdcBuffer);
+		it->OnDraw(hdcMem, hdcBuffer, bitmap.bmWidth, bitmap.bmHeight);
 	}
 
 	BitBlt(hdc, 0, 0, bitmap.bmWidth, bitmap.bmHeight, hdcBuffer, 0, 0, SRCCOPY);
@@ -212,4 +204,3 @@ void PlayerWindow::OnDraw(HDC hdc) {
 void PlayerWindow::OnMciNotify(WPARAM wParam, LPARAM lParam) {
 	//TODO
 }
-

@@ -147,15 +147,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="BitsOperations.h" />
     <ClInclude Include="GlobalDefinitions.h" />
     <ClInclude Include="KWindow.h" />
     <ClInclude Include="Main.h" />
+    <ClInclude Include="Player.h" />
     <ClInclude Include="PlayerWindow.h" />
     <ClInclude Include="ShapedButton.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BitsOperations.cpp" />
     <ClCompile Include="KWindow.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Player.cpp" />
     <ClCompile Include="PlayerWindow.cpp" />
     <ClCompile Include="ShapedButton.cpp" />
   </ItemGroup>

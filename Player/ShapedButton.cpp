@@ -1,26 +1,16 @@
 #include "ShapedButton.h"
 
-ShapedButton::~ShapedButton()
-{
-}
-
-void ShapedButton::setBitMaskBit(BYTE* pBits, LONG widthInBytes, LONG heightIdx, LONG widthIdxInBits) {
-	LONG ByteWithNeededBit = heightIdx * widthInBytes + widthIdxInBits / 8;
-	pBits[ByteWithNeededBit] += 1 << (7 - (widthIdxInBits % 8));
-}
-
-LONG ShapedButton::getMaskWidthFromPixelWidth(LONG widthInPixels) {
-	return (widthInPixels % 16 == 0 ? widthInPixels / 16 : widthInPixels / 16 + 1) * 2;
-}
-
 BOOL ShapedButton::IsCoordinatesInside(LONG x, LONG y) {
+	LONG realX = x - m_xOffset;
+	LONG realY = y - m_yOffset;
 	if (m_pButtonBits == NULL || m_bitMaskWidth == 0
-		|| y >= m_parentWindowHeight || x >= m_parentWindowWidth
-		|| y < 0 || x < 0) {
+		|| realY >= m_height || realX >= m_width
+		|| realY < 0 || realX < 0) {
 		return FALSE;
 	}
 	else {
-		return (m_pButtonBits[y * m_bitMaskWidth + x / 8] >> (7 - (x % 8))) % 2 == 0;
+		BYTE byteWithNeededBit = m_pButtonBits[realY * m_bitMaskWidth + realX / 8];
+		return (byteWithNeededBit >> (7 - (x % 8))) % 2 == 0;
 	}
 }
 
@@ -32,22 +22,38 @@ void ShapedButton::setStatus(ButtonStatus status) {
 	m_status = status;
 }
 
-void ShapedButton::OnDraw(HDC hdcMem, HDC hdcBuffer) {
+void ShapedButton::setClickHandler(void(*handler)(void)) {
+	m_clickHandler = handler;
+}
+
+void ShapedButton::setOffset(LONG x, LONG y) {
+	m_xOffset = x;
+	m_yOffset = y;
+}
+
+void ShapedButton::click() {
+	if (m_clickHandler == NULL) {
+		return;
+	}
+	m_clickHandler();
+}
+
+void ShapedButton::OnDraw(HDC hdcMem, HDC hdcBuffer, LONG windowWidth, LONG windowHieght) {
 	if (m_status == ACTIVE) {
 		SelectObject(hdcMem, m_activePicture);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCINVERT);
 		SelectObject(hdcMem, m_hBmpButtonMask);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCAND);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCAND);
 		SelectObject(hdcMem, m_activePicture);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCINVERT);
 	}
 	else if (m_status == DISABLED) {
 		SelectObject(hdcMem, m_disabledPicture);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCINVERT);
 		SelectObject(hdcMem, m_hBmpButtonMask);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCAND);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCAND);
 		SelectObject(hdcMem, m_disabledPicture);
-		BitBlt(hdcBuffer, 0, 0, m_parentWindowWidth, m_parentWindowHeight, hdcMem, 0, 0, SRCINVERT);
+		BitBlt(hdcBuffer, m_xOffset, m_yOffset, windowWidth, windowHieght, hdcMem, 0, 0, SRCINVERT);
 	}
 }
 
@@ -58,10 +64,10 @@ ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, HBITMAP activePi
 
 	GetObject(maskPicture, sizeof(bm), &bm);
 
-	m_parentWindowHeight = bm.bmHeight;
-	m_parentWindowWidth = bm.bmWidth;
+	m_height = bm.bmHeight;
+	m_width = bm.bmWidth;
 
-	m_bitMaskWidth = getMaskWidthFromPixelWidth(bm.bmWidth);
+	m_bitMaskWidth = BitsOperations::getWidthInBytes(bm.bmWidth);
 	m_pButtonBits = new unsigned char[bm.bmHeight * m_bitMaskWidth];
 	memset(m_pButtonBits, 0, sizeof(unsigned char) * bm.bmHeight * m_bitMaskWidth);
 
@@ -76,7 +82,7 @@ ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, HBITMAP activePi
 			pixel = pMaskBits[heightIdx * bm.bmWidth + widthIdx];
 
 			if (pixel != maskColor) {
-				setBitMaskBit(m_pButtonBits, m_bitMaskWidth, bm.bmHeight - heightIdx - 1, widthIdx);
+				BitsOperations::setBitInBitArray(m_pButtonBits, m_bitMaskWidth, bm.bmHeight - heightIdx - 1, widthIdx);
 			}
 		}
 	}
@@ -85,5 +91,11 @@ ShapedButton::ShapedButton(HBITMAP maskPicture, BYTE maskColor, HBITMAP activePi
 	m_disabledPicture = disabledPicture;
 
 	m_hBmpButtonMask = CreateBitmap(bm.bmWidth, bm.bmHeight, 1, 1, m_pButtonBits);
+}
+
+
+
+ShapedButton::~ShapedButton() {
+	//TODO
 }
 
