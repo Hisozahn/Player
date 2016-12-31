@@ -30,6 +30,7 @@ private:
 	HRGN m_hRgn;
 
 	cursorState m_cursorState = ARROW;
+	void(*m_mciNotificationHandler)(void);
 
 	vector<ShapedButton> m_buttons = vector<ShapedButton>();
 
@@ -43,13 +44,15 @@ private:
 	void OnMouseMove(int x, int y);
 	void OnLButtonDown(int x, int y);
 	void OnDraw(HDC hdc);
-	void OnMciNotify(WPARAM wParam, LPARAM lParam);
+	//void OnMciNotify(WPARAM wParam, LPARAM lParam);
 	void OnCreate();
 public:
 	bool CreateEx(DWORD dwExStyle,
 		LPCTSTR IpszClass, LPCTSTR IpszName, DWORD dwStyle,
 		int x, int y, int nWidth, int nHeight, HWND hParent,
 		HMENU hMenu, HINSTANCE hlnst);
+
+	//void setMciNotificationHandler(void(*handler)(void));
 
 	void addButton(ShapedButton button);
 	PlayerWindow() {}

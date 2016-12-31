@@ -81,9 +81,9 @@ LRESULT PlayerWindow::WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPa
 		y = HIWORD(lParam);
 		OnMouseMove(x, y);
 		break;
-	case MM_MCINOTIFY:
+	/*case MM_MCINOTIFY:
 		OnMciNotify(wParam, lParam);
-		break;
+		break;*/
 	case WM_LBUTTONDOWN:
 		x = LOWORD(lParam);
 		y = HIWORD(lParam);
@@ -127,6 +127,10 @@ bool PlayerWindow::CreateEx(DWORD dwExStyle, LPCTSTR IpszClass
 	return TRUE;
 }
 
+/*void PlayerWindow::setMciNotificationHandler(void(*handler)(void)) {
+	m_mciNotificationHandler = handler;
+}*/
+
 void PlayerWindow::addButton(ShapedButton button) {
 	m_buttons.push_back(button);
 }
@@ -134,14 +138,21 @@ void PlayerWindow::addButton(ShapedButton button) {
 void PlayerWindow::OnMouseMove(int x, int y) {
 	BOOL cursorOnButton = FALSE;
 
-	vector<ShapedButton>::iterator it;
-	for (it = m_buttons.begin(); it != m_buttons.end(); ++it) {
-		ShapedButton button = *it;
-		if (button.IsCoordinatesInside(x, y)) {
+	vector<ShapedButton>::iterator buttonIterator;
+	for (buttonIterator = m_buttons.begin(); buttonIterator != m_buttons.end(); ++buttonIterator) {
+		if (buttonIterator->IsCoordinatesInside(x, y)) {
+			if (buttonIterator->getStatus() == DISABLED) {
+				buttonIterator->setStatus(ACTIVE);
+			}
 			cursorOnButton = TRUE;
-			break;
+		}
+		else {
+			if (buttonIterator->getStatus() == ACTIVE) {
+				buttonIterator->setStatus(DISABLED);
+			}
 		}
 	}
+	InvalidateRect(m_hWnd, NULL, FALSE);
 	if (cursorOnButton) {
 		if (m_cursorState == ARROW) {
 			SetCursor(LoadCursor(NULL, IDC_HAND));
@@ -159,17 +170,10 @@ void PlayerWindow::OnLButtonDown(int x, int y) {
 	for (buttonIterator = m_buttons.begin(); buttonIterator != m_buttons.end(); ++buttonIterator) {
 		if (buttonIterator->IsCoordinatesInside(x, y)) {
 			buttonIterator->click();
-			if (buttonIterator->getStatus() == DISABLED) {
-				buttonIterator->setStatus(ACTIVE);
-			}
-			else {
-				buttonIterator->setStatus(DISABLED);
-			}
 			break;
 		}
 	}
 	InvalidateRect(m_hWnd, NULL, FALSE);
-	//MessageBox(m_hWnd, _T("Õ¿∆¿À"), _T("Œ“∆¿À"), NULL);
 }
 
 void PlayerWindow::OnDraw(HDC hdc) {
@@ -201,6 +205,8 @@ void PlayerWindow::OnDraw(HDC hdc) {
 	DeleteObject(bufferBitmap);
 }
 
-void PlayerWindow::OnMciNotify(WPARAM wParam, LPARAM lParam) {
-	//TODO
-}
+/*void PlayerWindow::OnMciNotify(WPARAM wParam, LPARAM lParam) {
+	if (m_mciNotificationHandler != NULL) {
+		m_mciNotificationHandler();
+	}
+}*/
